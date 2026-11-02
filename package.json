@@ -1,0 +1,28 @@
+{
+  "name": "spellcheck-webflow-extension",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Site Spell Checker Designer Extension. Checks the page open in Webflow Designer.",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && webflow extension bundle",
+    "dev": "tsc -p tsconfig.json && concurrently -r \"webflow extension serve\" \"tsc -p tsconfig.json --watch --preserveWatchOutput\"",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.tests.json --noEmit",
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "lint": "eslint ."
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@types/node": "^22.19.0",
+    "@webflow/designer-extension-typings": "^2.2.2",
+    "@webflow/webflow-cli": "^2.15.0",
+    "concurrently": "^8.2.2",
+    "eslint": "^10.14.0",
+    "eslint-plugin-promise": "^7.3.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.72.1"
+  }
+}

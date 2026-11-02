@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Site Spell Checker</title>
+    <link href="./styles.css" rel="stylesheet" />
+  </head>
+  <body>
+    <main class="app">
+      <header>
+        <h1>Site Spell Checker</h1>
+        <p id="page-name">English (US). This page only.</p>
+      </header>
+      <button id="check" type="button">Check spelling</button>
+      <p id="status" role="status"></p>
+      <div id="results"></div>
+      <section class="cta" id="cta">
+        <p id="cta-copy">
+          This check covers the page open in the Designer. A full-site scan
+          checks every published page.
+        </p>
+        <a
+          id="cta-link"
+          href="https://sitespellchecker.com/site-scans/checkout?ref=webflow-app&amp;utm_source=webflow&amp;utm_medium=app&amp;utm_campaign=designer-extension"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Scan every page of your site</a
+        >
+      </section>
+      <p id="ignore-note">
+        Ignore keeps a word in this browser for this site. It does not change
+        the Webflow project.
+      </p>
+      <button id="clear-ignored" type="button" hidden>Clear ignored words</button>
+      <footer>
+        <p>Checks run in this browser. Page text is not uploaded.</p>
+        <p>
+          <a
+            href="https://sitespellchecker.com/privacy"
+            target="_blank"
+            rel="noopener noreferrer"
+            >Privacy</a
+          >
+          ·
+          <a
+            href="https://sitespellchecker.com/terms"
+            target="_blank"
+            rel="noopener noreferrer"
+            >Terms</a
+          >
+        </p>
+      </footer>
+    </main>
+    <script src="./vendor/typo.js"></script>
+    <script type="module" src="./index.js"></script>
+  </body>
+</html>
