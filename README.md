@@ -19,7 +19,7 @@ While a component is open, the check is that component's canvas instead of the p
 
 Words are tokenized the same way as the WordPress plugin: contractions and possessives stay whole, URLs and email addresses are skipped, ALL-CAPS acronyms are skipped, and a capitalized word in the middle of a sentence is treated as a name. SEO and search titles are checked word by word, because they are often Title Case. A capitalized word in a title is still skipped when that word also appears mid-sentence in the body.
 
-Ignore stores the word in this browser for this site (`localStorage`). It does not write to Webflow.
+Ignore stores the word in this browser for this site (`localStorage`) after the Designer reports a site id. It does not write to Webflow, and it does not keep a shared list for an unidentified site. A scan that stops at 200 distinct misspellings, or that could not read some fields, says the result is partial.
 
 Text inside a component that is not exposed as an instance prop is checked when that component is open. Bound CMS field values are not read. Other pages and other CMS items are not scanned.
 

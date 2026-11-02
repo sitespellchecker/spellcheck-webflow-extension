@@ -33,7 +33,7 @@ const dictionary = new Typo(
 );
 
 const words = (text: string) =>
-  findIssues([{ id: "body", text, role: "body", label: "On this page" }], dictionary).map(
+  findIssues([{ id: "body", text, role: "body", label: "On this page" }], dictionary).issues.map(
     (issue) => issue.word,
   );
 
@@ -49,11 +49,12 @@ test("real misspellings are flagged and ranked suggestions prefer the typo", () 
     ],
     dictionary,
   );
+  assert.equal(found.truncated, false);
   assert.deepEqual(
-    found.map((issue) => issue.word),
+    found.issues.map((issue) => issue.word),
     ["recieve", "teh", "tommorow"],
   );
-  assert.ok(found[0]?.suggestions.includes("receive"));
+  assert.ok(found.issues[0]?.suggestions.includes("receive"));
   assert.equal(rankSuggestions("recieve", ["relieve", "receive", "recipe"])[0], "receive");
 });
 
@@ -88,11 +89,12 @@ test("a capitalized word is still skipped in a title when the body uses it as a 
     dictionary,
     { suggestions: false },
   );
+  assert.equal(found.truncated, false);
   assert.deepEqual(
-    found.map((issue) => issue.word),
+    found.issues.map((issue) => issue.word),
     ["Recipie", "Begginers"],
   );
-  assert.ok(found.every((issue) => issue.locations[0]?.label === "SEO title"));
+  assert.ok(found.issues.every((issue) => issue.locations[0]?.label === "SEO title"));
 });
 
 test("repeated misspellings are one issue, and the ignore list is case-insensitive", () => {
@@ -101,14 +103,15 @@ test("repeated misspellings are one issue, and the ignore list is case-insensiti
     dictionary,
     { suggestions: false },
   );
-  assert.equal(found.length, 1);
-  assert.equal(found[0]?.count, 3);
+  assert.equal(found.issues.length, 1);
+  assert.equal(found.issues[0]?.count, 3);
+  assert.equal(found.truncated, false);
   assert.deepEqual(
     findIssues(
       [{ id: "body", text: "Our Gutenbergy blocks are fab\u2019lous.", role: "body", label: "On this page" }],
       dictionary,
       { ignore: ["gutenbergy", "fab'lous"], suggestions: false },
-    ),
+    ).issues,
     [],
   );
 });

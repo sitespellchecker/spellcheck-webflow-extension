@@ -7,7 +7,10 @@ function normalizeWord(word: string): string {
 }
 
 export function ignoreStorageKey(siteId: string): string {
-  return STORAGE_PREFIX + (siteId || "unknown");
+  if (!siteId) {
+    throw new Error("Site id is required to store ignored words.");
+  }
+  return STORAGE_PREFIX + siteId;
 }
 
 export function readIgnored(storage: Storage, siteId: string): string[] {

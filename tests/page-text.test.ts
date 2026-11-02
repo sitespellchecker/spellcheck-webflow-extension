@@ -106,6 +106,32 @@ test("collects page settings, canvas text, alt text, form copy, and component pr
   assert.equal(collected.segments[3]?.element, elements[0]);
 });
 
+test("failed page setting reads are counted instead of treated as empty copy", async () => {
+  const collected = await collectPageText(
+    {
+      getCurrentPage: () =>
+        Promise.resolve({
+          getTitle: () => Promise.reject(new Error("title unavailable")),
+          getDescription: () => Promise.resolve("Fresh bread"),
+          usesTitleAsSearchTitle: () => Promise.reject(new Error("flag unavailable")),
+          getSearchTitle: () => Promise.resolve("Custom search title"),
+          usesDescriptionAsSearchDescription: () => Promise.resolve(true),
+          getSearchDescription: () => Promise.reject(new Error("should not be read")),
+          usesTitleAsOpenGraphTitle: () => Promise.resolve(true),
+          usesDescriptionAsOpenGraphDescription: () => Promise.reject(new Error("flag unavailable")),
+          getOpenGraphDescription: () => Promise.reject(new Error("description unavailable")),
+        }),
+      getAllElements: () => Promise.resolve([]),
+    },
+    { includePageSettings: true },
+  );
+  assert.deepEqual(
+    collected.segments.map((item) => item.text),
+    ["Fresh bread", "Custom search title"],
+  );
+  assert.equal(collected.unread, 4);
+});
+
 test("skips page settings while a component is open", async () => {
   const collected = await collectPageText(
     {

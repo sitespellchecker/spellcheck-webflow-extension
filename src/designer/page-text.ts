@@ -138,93 +138,113 @@ function segment<T extends CopyElement>(
   return { id, text, role, label, element };
 }
 
-async function readOptional(read: (() => Promise<string>) | undefined): Promise<string> {
+async function readString(
+  read: (() => Promise<string>) | undefined,
+): Promise<{ failed: boolean; value: string }> {
   if (!read) {
-    return "";
+    return { failed: false, value: "" };
   }
   try {
-    return (await read()) ?? "";
+    return { failed: false, value: (await read()) ?? "" };
   } catch {
-    return "";
+    return { failed: true, value: "" };
   }
 }
 
-async function readFlag(read: (() => Promise<boolean>) | undefined): Promise<boolean> {
+async function readFlag(
+  read: (() => Promise<boolean>) | undefined,
+): Promise<{ failed: boolean; inherited: boolean }> {
   if (!read) {
-    return true;
+    return { failed: false, inherited: true };
   }
   try {
-    return await read();
+    return { failed: false, inherited: await read() };
   } catch {
-    return true;
+    return { failed: true, inherited: false };
   }
 }
 
 async function pageSegments<T extends CopyElement>(
   page: PageSettingsSource | null,
-): Promise<TextSegment<T>[]> {
+): Promise<{ segments: TextSegment<T>[]; failed: number }> {
   if (!page) {
-    return [];
+    return { segments: [], failed: 0 };
   }
   const segments: TextSegment<T>[] = [];
-  const title = await readOptional(page.getTitle);
-  if (hasCopy(title)) {
-    segments.push(segment<T>("page:title", title, "title", "SEO title", null));
+  let failed = 0;
+  const title = await readString(page.getTitle);
+  if (title.failed) {
+    failed += 1;
+  } else if (hasCopy(title.value)) {
+    segments.push(segment<T>("page:title", title.value, "title", "SEO title", null));
   }
-  const description = await readOptional(page.getDescription);
-  if (hasCopy(description)) {
+  const description = await readString(page.getDescription);
+  if (description.failed) {
+    failed += 1;
+  } else if (hasCopy(description.value)) {
     segments.push(
-      segment<T>("page:description", description, "body", "SEO description", null),
+      segment<T>("page:description", description.value, "body", "SEO description", null),
     );
   }
-  if (!(await readFlag(page.usesTitleAsSearchTitle))) {
-    const searchTitle = await readOptional(page.getSearchTitle);
-    if (hasCopy(searchTitle) && searchTitle.trim() !== title.trim()) {
-      segments.push(
-        segment<T>("page:search-title", searchTitle, "title", "Search title", null),
-      );
-    }
+  failed += await addCustomField(segments, {
+    id: "page:search-title",
+    label: "Search title",
+    role: "title",
+    baseline: title.value,
+    inherited: page.usesTitleAsSearchTitle,
+    read: page.getSearchTitle,
+  });
+  failed += await addCustomField(segments, {
+    id: "page:search-description",
+    label: "Search description",
+    role: "body",
+    baseline: description.value,
+    inherited: page.usesDescriptionAsSearchDescription,
+    read: page.getSearchDescription,
+  });
+  failed += await addCustomField(segments, {
+    id: "page:og-title",
+    label: "Social title",
+    role: "title",
+    baseline: title.value,
+    inherited: page.usesTitleAsOpenGraphTitle,
+    read: page.getOpenGraphTitle,
+  });
+  failed += await addCustomField(segments, {
+    id: "page:og-description",
+    label: "Social description",
+    role: "body",
+    baseline: description.value,
+    inherited: page.usesDescriptionAsOpenGraphDescription,
+    read: page.getOpenGraphDescription,
+  });
+  return { segments, failed };
+}
+
+async function addCustomField<T extends CopyElement>(
+  segments: TextSegment<T>[],
+  field: {
+    id: string;
+    label: string;
+    role: "title" | "body";
+    baseline: string;
+    inherited: (() => Promise<boolean>) | undefined;
+    read: (() => Promise<string>) | undefined;
+  },
+): Promise<number> {
+  const flag = await readFlag(field.inherited);
+  if (!flag.failed && flag.inherited) {
+    return 0;
   }
-  if (!(await readFlag(page.usesDescriptionAsSearchDescription))) {
-    const searchDescription = await readOptional(page.getSearchDescription);
-    if (hasCopy(searchDescription) && searchDescription.trim() !== description.trim()) {
-      segments.push(
-        segment<T>(
-          "page:search-description",
-          searchDescription,
-          "body",
-          "Search description",
-          null,
-        ),
-      );
-    }
+  const failed = flag.failed ? 1 : 0;
+  const custom = await readString(field.read);
+  if (custom.failed) {
+    return failed + 1;
   }
-  if (!(await readFlag(page.usesTitleAsOpenGraphTitle))) {
-    const openGraphTitle = await readOptional(page.getOpenGraphTitle);
-    if (hasCopy(openGraphTitle) && openGraphTitle.trim() !== title.trim()) {
-      segments.push(
-        segment<T>("page:og-title", openGraphTitle, "title", "Social title", null),
-      );
-    }
+  if (hasCopy(custom.value) && custom.value.trim() !== field.baseline.trim()) {
+    segments.push(segment<T>(field.id, custom.value, field.role, field.label, null));
   }
-  if (!(await readFlag(page.usesDescriptionAsOpenGraphDescription))) {
-    const openGraphDescription = await readOptional(page.getOpenGraphDescription);
-    if (
-      hasCopy(openGraphDescription) &&
-      openGraphDescription.trim() !== description.trim()
-    ) {
-      segments.push(
-        segment<T>(
-          "page:og-description",
-          openGraphDescription,
-          "body",
-          "Social description",
-          null,
-        ),
-      );
-    }
-  }
-  return segments;
+  return failed;
 }
 
 async function elementSegments<T extends CopyElement>(
@@ -322,7 +342,9 @@ export async function collectPageText<T extends CopyElement>(
   if (options.includePageSettings) {
     try {
       const page = await source.getCurrentPage();
-      segments.push(...(await pageSegments<T>(page)));
+      const settings = await pageSegments<T>(page);
+      segments.push(...settings.segments);
+      unread += settings.failed;
     } catch {
       unread += 1;
     }

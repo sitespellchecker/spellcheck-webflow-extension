@@ -26,6 +26,12 @@ function memoryStorage(): Storage {
   };
 }
 
+test("an unknown site does not share an ignore list", () => {
+  const storage = memoryStorage();
+  assert.throws(() => rememberIgnored(storage, "", "secret"));
+  assert.equal(storage.length, 0);
+});
+
 test("ignored words are stored per site and normalized", () => {
   const storage = memoryStorage();
   rememberIgnored(storage, "site-a", "Fab\u2019lous");

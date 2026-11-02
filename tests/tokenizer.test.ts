@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { tokenize } from "../src/spellcheck/tokenizer.ts";
+import { findIssues, tokenize, type SpellChecker } from "../src/spellcheck/tokenizer.ts";
 
 const words = (text: string, ignoreAllCaps?: boolean) =>
   tokenize(text, ignoreAllCaps === undefined ? {} : { ignoreAllCaps }).map(
@@ -73,6 +73,24 @@ test("keeps accented letters and skips numbers, urls, emails, and acronyms", () 
     "is",
     "fine",
   ]);
+});
+
+test("a capped scan reports truncation instead of a complete result", () => {
+  const checker: SpellChecker = {
+    check: () => false,
+    suggest: () => [],
+  };
+  const text = ["alpha", "bravo", "charlie"].join(" ");
+  const segment = { id: "body", text, role: "body" as const, label: "On this page" };
+  const capped = findIssues([segment], checker, { max: 2, suggestions: false });
+  assert.equal(capped.truncated, true);
+  assert.deepEqual(
+    capped.issues.map((issue) => issue.word),
+    ["alpha", "bravo"],
+  );
+  const complete = findIssues([segment], checker, { max: 3, suggestions: false });
+  assert.equal(complete.truncated, false);
+  assert.equal(complete.issues.length, 3);
 });
 
 test("marks a new sentence after punctuation that follows a url", () => {

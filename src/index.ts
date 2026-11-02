@@ -27,6 +27,8 @@ const clearIgnoredButton = required<HTMLButtonElement>("#clear-ignored");
 
 let siteId = "";
 let busy = false;
+let viewGeneration = 0;
+let resultsTruncated = false;
 
 function designerAvailable(): boolean {
   return typeof webflow !== "undefined" && typeof webflow.getAllElements === "function";
@@ -40,13 +42,32 @@ function issueCountLabel(count: number): string {
   return count === 1 ? "1 possible issue on this page." : `${count} possible issues on this page.`;
 }
 
-async function refreshHeader(): Promise<void> {
+function syncCheckButton(): void {
+  checkButton.disabled = busy || !designerAvailable() || siteId === "";
+}
+
+async function loadSite(): Promise<boolean> {
+  if (!designerAvailable()) {
+    return false;
+  }
+  try {
+    const site = await webflow.getSiteInfo();
+    if (!site.siteId) {
+      return false;
+    }
+    siteId = site.siteId;
+    ctaLink.href = buildCheckoutUrl(pickSiteDomain(site));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function refreshLabel(): Promise<void> {
   if (!designerAvailable()) {
     pageName.textContent = "Open this app from the Webflow Designer. English (US).";
-    checkButton.disabled = true;
     return;
   }
-  checkButton.disabled = false;
   try {
     const component = await webflow.getCurrentComponent();
     if (component) {
@@ -57,12 +78,18 @@ async function refreshHeader(): Promise<void> {
       const name = await page.getName();
       pageName.textContent = `${name}. English (US). This page only.`;
     }
-    const site = await webflow.getSiteInfo();
-    siteId = site.siteId;
-    ctaLink.href = buildCheckoutUrl(pickSiteDomain(site));
   } catch {
     pageName.textContent = "English (US). This page only.";
   }
+}
+
+async function refreshHeader(): Promise<void> {
+  syncCheckButton();
+  await refreshLabel();
+  if (!siteId) {
+    await loadSite();
+  }
+  syncCheckButton();
 }
 
 function renderIssues(issues: Issue[], segments: TextSegment<AnyElement>[]): void {
@@ -133,18 +160,27 @@ function renderIssue(issue: Issue, segments: TextSegment<AnyElement>[]): HTMLLIE
   ignore.type = "button";
   ignore.textContent = "Ignore";
   ignore.addEventListener("click", () => {
+    if (!siteId) {
+      setStatus("This site could not be identified, so the word was not ignored.");
+      return;
+    }
     try {
       rememberIgnored(window.localStorage, siteId, issue.word);
     } catch {
       setStatus("This browser could not store the ignored word.");
+      return;
     }
     item.remove();
     const remaining = results.querySelectorAll(".issues li").length;
-    setStatus(
-      remaining === 0
-        ? "No spelling issues left on this page."
-        : issueCountLabel(remaining),
-    );
+    if (remaining === 0 && resultsTruncated) {
+      setStatus("Shown issues are ignored. This list was partial. Check spelling again for the rest.");
+      updateCta(0, true);
+    } else if (remaining === 0) {
+      setStatus("No spelling issues left on this page.");
+      updateCta(0, false);
+    } else {
+      setStatus(issueCountLabel(remaining));
+    }
     clearIgnoredButton.hidden = readIgnored(window.localStorage, siteId).length === 0;
   });
   actions.append(suggest, ignore);
@@ -167,11 +203,16 @@ function renderIssue(issue: Issue, segments: TextSegment<AnyElement>[]): HTMLLIE
   return item;
 }
 
-function updateCta(issueCount: number | null): void {
+function updateCta(issueCount: number | null, incomplete = false): void {
   cta.hidden = false;
   if (issueCount === null) {
     ctaCopy.textContent =
       "This check covers the page open in the Designer. A full-site scan checks every published page.";
+    return;
+  }
+  if (incomplete) {
+    ctaCopy.textContent =
+      "This check is incomplete. A full-site scan checks every published page.";
     return;
   }
   ctaCopy.textContent =
@@ -180,16 +221,38 @@ function updateCta(issueCount: number | null): void {
       : `${issueCountLabel(issueCount)} A full-site scan checks every published page.`;
 }
 
+function unreadNote(unread: number): string {
+  if (unread === 0) {
+    return "";
+  }
+  return unread === 1 ? " 1 field was not read." : ` ${unread} fields were not read.`;
+}
+
 async function checkSpelling(): Promise<void> {
   if (busy || !designerAvailable()) {
     return;
   }
   busy = true;
-  checkButton.disabled = true;
+  const generation = viewGeneration;
+  syncCheckButton();
   results.replaceChildren();
+  resultsTruncated = false;
   setStatus("Reading this page…");
   try {
+    if (!siteId) {
+      const loaded = await loadSite();
+      if (generation !== viewGeneration) {
+        return;
+      }
+      if (!loaded) {
+        setStatus("This site could not be identified, so spelling was not checked.");
+        return;
+      }
+    }
     const component = await webflow.getCurrentComponent();
+    if (generation !== viewGeneration) {
+      return;
+    }
     const collected = await collectPageText<AnyElement>(
       {
         getCurrentPage: () => webflow.getCurrentPage(),
@@ -197,10 +260,16 @@ async function checkSpelling(): Promise<void> {
       },
       { includePageSettings: component === null },
     );
+    if (generation !== viewGeneration) {
+      return;
+    }
     setStatus("Checking spelling…");
     const checker = await loadDictionary();
+    if (generation !== viewGeneration) {
+      return;
+    }
     const ignored = readIgnored(window.localStorage, siteId);
-    const issues = findIssues(
+    const scan = findIssues(
       collected.segments.map((entry) => ({
         id: entry.id,
         text: entry.text,
@@ -210,19 +279,34 @@ async function checkSpelling(): Promise<void> {
       checker,
       { ignore: ignored, suggestions: false },
     );
-    renderIssues(issues, collected.segments);
-    const unread =
-      collected.unread > 0 ? ` ${collected.unread} elements could not be read.` : "";
-    if (collected.segments.length === 0) {
-      setStatus(`No text found in the open Designer view.${unread}`);
-    } else if (issues.length === 0) {
-      setStatus(`No spelling issues found on this page.${unread}`);
-    } else {
-      setStatus(`${issueCountLabel(issues.length)}${unread}`);
+    if (generation !== viewGeneration) {
+      return;
     }
-    updateCta(issues.length);
+    resultsTruncated = scan.truncated;
+    const incomplete = scan.truncated || collected.unread > 0;
+    renderIssues(scan.issues, collected.segments);
+    const missed = unreadNote(collected.unread);
+    if (scan.truncated) {
+      setStatus(
+        `${issueCountLabel(scan.issues.length)} This list is partial. Check spelling again after you review these.${missed}`,
+      );
+    } else if (collected.segments.length === 0 && collected.unread > 0) {
+      setStatus(`Page text could not be read.${missed}`);
+    } else if (collected.segments.length === 0) {
+      setStatus("No text found in the open Designer view.");
+    } else if (scan.issues.length === 0 && collected.unread > 0) {
+      setStatus(`No spelling issues in the text that could be read.${missed}`);
+    } else if (scan.issues.length === 0) {
+      setStatus("No spelling issues found on this page.");
+    } else {
+      setStatus(`${issueCountLabel(scan.issues.length)}${missed}`);
+    }
+    updateCta(scan.issues.length, incomplete);
     clearIgnoredButton.hidden = ignored.length === 0;
   } catch (error) {
+    if (generation !== viewGeneration) {
+      return;
+    }
     const message =
       error instanceof Error ? error.message : "Spell check could not be completed.";
     setStatus(message);
@@ -231,7 +315,7 @@ async function checkSpelling(): Promise<void> {
     }
   } finally {
     busy = false;
-    checkButton.disabled = false;
+    syncCheckButton();
   }
 }
 
@@ -240,24 +324,33 @@ checkButton.addEventListener("click", () => {
 });
 
 clearIgnoredButton.addEventListener("click", () => {
+  if (!siteId) {
+    setStatus("This site could not be identified, so ignored words were not cleared.");
+    return;
+  }
   clearIgnored(window.localStorage, siteId);
   clearIgnoredButton.hidden = true;
   setStatus("Ignored words cleared for this site in this browser.");
 });
 
+function leaveView(message: string): void {
+  viewGeneration += 1;
+  resultsTruncated = false;
+  results.replaceChildren();
+  setStatus(message);
+  updateCta(null);
+  void refreshHeader();
+}
+
 updateCta(null);
+checkButton.disabled = true;
 void refreshHeader();
 
 if (designerAvailable()) {
   webflow.subscribe("currentpage", () => {
-    results.replaceChildren();
-    setStatus("");
-    updateCta(null);
-    void refreshHeader();
+    leaveView("");
   });
   webflow.subscribe("currentcmsitem", () => {
-    results.replaceChildren();
-    setStatus("The open CMS item changed. Check spelling again for this view.");
-    updateCta(null);
+    leaveView("The open CMS item changed. Check spelling again for this view.");
   });
 }

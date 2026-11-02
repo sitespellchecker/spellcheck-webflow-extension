@@ -41,6 +41,11 @@ export interface FindIssuesOptions {
   max?: number;
 }
 
+export interface IssueScan {
+  issues: Issue[];
+  truncated: boolean;
+}
+
 const CLITIC = /'(?:s|d|ll|ve|re|m)$/i;
 const TRAILING_PUNCTUATION = /[.,;:!?)\]}'"\u2019\u201d]+$/;
 
@@ -203,7 +208,7 @@ export function findIssues(
   segments: readonly IssueSegment[],
   checker: SpellChecker,
   options: FindIssuesOptions = {},
-): Issue[] {
+): IssueScan {
   const skipCapitalized = options.skipCapitalized !== false;
   const max = options.max ?? 200;
   const maxSuggestions = options.suggestions === false ? 0 : options.suggestions ?? 3;
@@ -264,7 +269,7 @@ export function findIssues(
         continue;
       }
       if (found.size >= max) {
-        return finish(found, checker, maxSuggestions);
+        return { issues: finish(found, checker, maxSuggestions), truncated: true };
       }
       found.set(key, {
         word: token.word,
@@ -280,7 +285,7 @@ export function findIssues(
       });
     }
   }
-  return finish(found, checker, maxSuggestions);
+  return { issues: finish(found, checker, maxSuggestions), truncated: false };
 }
 
 function finish(
