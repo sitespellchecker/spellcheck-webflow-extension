@@ -1,0 +1,132 @@
+:root {
+  color-scheme: dark;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  background: #1b1b1b;
+  color: #f3f3f3;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+body {
+  margin: 0;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 650;
+}
+
+#page-name,
+#status,
+#ignore-note,
+footer p,
+.cta p,
+.context,
+.suggestions {
+  margin: 0;
+}
+
+#page-name,
+#ignore-note,
+footer {
+  color: #c6c6c6;
+}
+
+button,
+.cta a {
+  font: inherit;
+  border-radius: 4px;
+  border: 1px solid #0073e6;
+  background: #0073e6;
+  color: #fff;
+  padding: 6px 10px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+button:disabled {
+  background: #3a3a3a;
+  border-color: #3a3a3a;
+  color: #9a9a9a;
+  cursor: default;
+}
+
+button:focus-visible,
+.cta a:focus-visible,
+footer a:focus-visible {
+  outline: 2px solid #9cc9ff;
+  outline-offset: 2px;
+}
+
+.actions button,
+#clear-ignored {
+  background: transparent;
+  color: #9cc9ff;
+}
+
+.issues {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.issues li {
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.issue-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.badge {
+  color: #d7d7d7;
+  background: #333;
+  border-radius: 999px;
+  padding: 1px 6px;
+  font-size: 11px;
+}
+
+.context,
+.suggestions {
+  margin-top: 6px;
+  color: #d7d7d7;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.cta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid #3a3a3a;
+  padding-top: 10px;
+}
+
+.cta a {
+  align-self: flex-start;
+}
+
+footer a {
+  color: #9cc9ff;
+}
